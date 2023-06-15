@@ -47,7 +47,6 @@ async function run() {
     const taskCollection = client.db("TaskManagement").collection("tasks");
     app.post("/users", async (req, res) => {
       const { email } = req.body;
-      console.log(50, email);
       // get token by signing jwt.
       const token = jwt.sign(email, process.env.SECRET_ACCESS_TOKEN);
       const existUser = await userCollection.findOne({ email });
@@ -62,7 +61,20 @@ async function run() {
       result.token = token;
       res.send(result);
     });
-
+    app.get("/tasks", verifyJWT, async (req, res) => {
+      const email = req.query.email;
+      if (email !== req.decodedEmail) {
+        return res.status(401).send({ error: true, message: "Invalid Email" });
+      }
+      try {
+        const result = await taskCollection
+          .find({ user_email: email })
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        res.send({ error: true, message: error?.message });
+      }
+    });
     app.post("/task", async (req, res) => {
       try {
         const { title, user_email, description, status } = req.body;
@@ -77,11 +89,14 @@ async function run() {
         res.send({ error: true, message: error?.message });
       }
     });
-    app.put("/task/:id", async (req, res) => {
+
+    app.put("/task/:id", verifyJWT, async (req, res) => {
+      const email = req.query.email;
+      if (email !== req.decodedEmail) {
+        return res.status(401).send({ error: true, message: "Invalid Email" });
+      }
       const id = req.params.id;
-      console.log(82, id);
       const { title, description, status } = req.body;
-      console.log(84, title, description, status);
       const updateTaskInfo = { title, description, status };
       try {
         const result = await taskCollection.updateOne(
@@ -94,7 +109,11 @@ async function run() {
         res.send({ error: true, message: error?.message });
       }
     });
-    app.delete("/task/:id", async (req, res) => {
+    app.delete("/task/:id", verifyJWT, async (req, res) => {
+      const email = req.query.email;
+      if (email !== req.decodedEmail) {
+        return res.status(401).send({ error: true, message: "Invalid Email" });
+      }
       const id = req.params.id;
       try {
         const result = await taskCollection.deleteOne({
