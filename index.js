@@ -94,6 +94,17 @@ async function run() {
         res.send({ error: true, message: error?.message });
       }
     });
+    app.delete("/task/:id", async (req, res) => {
+      const id = req.params.id;
+      try {
+        const result = await taskCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        res.send(result);
+      } catch (error) {
+        res.send({ error: true, message: error?.message });
+      }
+    });
   } finally {
     //  await  client.close()
   }
