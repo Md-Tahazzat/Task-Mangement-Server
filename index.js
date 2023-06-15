@@ -44,9 +44,10 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const userCollection = client.db("TaskManagement").collection("users");
-
+    const taskCollection = client.db("TaskManagement").collection("tasks");
     app.post("/users", async (req, res) => {
-      const { email } = req.body.user;
+      const { email } = req.body;
+      console.log(50, email);
       // get token by signing jwt.
       const token = jwt.sign(email, process.env.SECRET_ACCESS_TOKEN);
       const existUser = await userCollection.findOne({ email });
@@ -60,6 +61,21 @@ async function run() {
       });
       result.token = token;
       res.send(result);
+    });
+
+    app.post("/task", async (req, res) => {
+      try {
+        const { title, user_email, description, status } = req.body;
+        const result = await taskCollection.insertOne({
+          title,
+          description,
+          status,
+          user_email,
+        });
+        res.send(result);
+      } catch (error) {
+        res.send({ error: true, message: error?.message });
+      }
     });
   } finally {
     //  await  client.close()
