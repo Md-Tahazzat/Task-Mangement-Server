@@ -79,12 +79,14 @@ async function run() {
     });
     app.put("/task/:id", async (req, res) => {
       const id = req.params.id;
+      console.log(82, id);
       const { title, description, status } = req.body;
+      console.log(84, title, description, status);
       const updateTaskInfo = { title, description, status };
       try {
         const result = await taskCollection.updateOne(
           { _id: new ObjectId(id) },
-          { $set: { updateTaskInfo } },
+          { $set: { title, description, status } },
           { upsert: true }
         );
         res.send(result);
