@@ -79,6 +79,18 @@ async function run() {
     });
     app.put("/task/:id", async (req, res) => {
       const id = req.params.id;
+      const { title, description, status } = req.body;
+      const updateTaskInfo = { title, description, status };
+      try {
+        const result = await taskCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { updateTaskInfo } },
+          { upsert: true }
+        );
+        res.send(result);
+      } catch (error) {
+        res.send({ error: true, message: error?.message });
+      }
     });
   } finally {
     //  await  client.close()
