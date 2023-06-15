@@ -29,6 +29,14 @@ const verifyJWT = async (req, res, next) => {
   });
 };
 
+const checkEmail = (req, res, next) => {
+  const email = req.query.email;
+  if (email !== req.decodedEmail) {
+    return res.status(401).send({ error: true, message: "Invalid Email" });
+  }
+  next();
+};
+
 // MongoDB connection uri
 const uri = `mongodb+srv://${process.env.MONGODB_USER}:${process.env.MONGODB_PASS}@cluster0.v7xfdwv.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -45,7 +53,7 @@ async function run() {
   try {
     const userCollection = client.db("TaskManagement").collection("users");
     const taskCollection = client.db("TaskManagement").collection("tasks");
-    app.post("/users", async (req, res) => {
+    app.post("/user", async (req, res) => {
       const { email } = req.body;
       // get token by signing jwt.
       const token = jwt.sign(email, process.env.SECRET_ACCESS_TOKEN);
@@ -61,11 +69,19 @@ async function run() {
       result.token = token;
       res.send(result);
     });
-    app.get("/tasks", verifyJWT, async (req, res) => {
-      const email = req.query.email;
-      if (email !== req.decodedEmail) {
-        return res.status(401).send({ error: true, message: "Invalid Email" });
+
+    app.get("/tasks/:id", async (req, res) => {
+      const id = req.params.id;
+      try {
+        const result = await taskCollection.findOne({ _id: new ObjectId(id) });
+        res.send(result);
+      } catch (error) {
+        res.send({ error: true, message: error?.message });
       }
+    });
+
+    app.get("/tasks", verifyJWT, checkEmail, async (req, res) => {
+      const email = req.query.email;
       try {
         const result = await taskCollection
           .find({ user_email: email })
@@ -90,35 +106,27 @@ async function run() {
       }
     });
 
-    app.put("/task/:id", verifyJWT, async (req, res) => {
-      const email = req.query.email;
-      if (email !== req.decodedEmail) {
-        return res.status(401).send({ error: true, message: "Invalid Email" });
+    app.delete("/tasks/:id", async (req, res) => {
+      const id = req.params.id;
+      try {
+        const result = await taskCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        res.send(result);
+      } catch (error) {
+        res.send({ error: true, message: error?.message });
       }
+    });
+
+    app.put("/tasks/:id", async (req, res) => {
       const id = req.params.id;
       const { title, description, status } = req.body;
-      const updateTaskInfo = { title, description, status };
       try {
         const result = await taskCollection.updateOne(
           { _id: new ObjectId(id) },
           { $set: { title, description, status } },
           { upsert: true }
         );
-        res.send(result);
-      } catch (error) {
-        res.send({ error: true, message: error?.message });
-      }
-    });
-    app.delete("/task/:id", verifyJWT, async (req, res) => {
-      const email = req.query.email;
-      if (email !== req.decodedEmail) {
-        return res.status(401).send({ error: true, message: "Invalid Email" });
-      }
-      const id = req.params.id;
-      try {
-        const result = await taskCollection.deleteOne({
-          _id: new ObjectId(id),
-        });
         res.send(result);
       } catch (error) {
         res.send({ error: true, message: error?.message });
