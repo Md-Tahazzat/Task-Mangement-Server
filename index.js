@@ -77,6 +77,9 @@ async function run() {
         res.send({ error: true, message: error?.message });
       }
     });
+    app.put("/task/:id", async (req, res) => {
+      const id = req.params.id;
+    });
   } finally {
     //  await  client.close()
   }
