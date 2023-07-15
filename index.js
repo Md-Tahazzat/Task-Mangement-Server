@@ -10,29 +10,34 @@ require("dotenv").config();
 app.use(cors());
 app.use(express.json());
 
+// JWT vefification functionality
 const verifyJWT = async (req, res, next) => {
   const authorization = req.headers?.authorization;
   if (!authorization) {
-    return res.status(401).send({ error: true, message: "Unauthorized entry" });
-  }
-  const token = authorization.split(" ")[1];
-  if (!token) {
-    return res.status(401).send({ error: true, message: "Unauthorized entry" });
+    return res.status(401).json({ error: true, message: "Unauthorized entry" });
   }
 
+  // get the token
+  const token = authorization.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ error: true, message: "Unauthorized entry" });
+  }
+
+  // verify the token
   jwt.verify(token, process.env.SECRET_ACCESS_TOKEN, (err, decoded) => {
     if (err) {
-      return res.status(403).send({ error: true, message: "Forbidden Access" });
+      return res.status(401).json({ error: true, message: "Invalid token" });
     }
     req.decodedEmail = decoded;
     next();
   });
 };
 
+// check the email is matching with the jwt decoded email or not.
 const checkEmail = (req, res, next) => {
   const email = req.query.email;
   if (email !== req.decodedEmail) {
-    return res.status(401).send({ error: true, message: "Invalid Email" });
+    return res.status(401).json({ error: true, message: "Invalid Email" });
   }
   next();
 };
@@ -55,11 +60,13 @@ async function run() {
     const taskCollection = client.db("TaskManagement").collection("tasks");
     app.post("/user", async (req, res) => {
       const { email } = req.body;
+
       // get token by signing jwt.
       const token = jwt.sign(email, process.env.SECRET_ACCESS_TOKEN);
       const existUser = await userCollection.findOne({ email });
 
       if (existUser) {
+        // user already exist in Database
         existUser.token = token;
         return res.send(existUser);
       }
@@ -70,16 +77,18 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/tasks/:id", async (req, res) => {
+    // get specific task by objectId
+    app.get("/tasks/:id", verifyJWT, checkEmail, async (req, res) => {
       const id = req.params.id;
       try {
         const result = await taskCollection.findOne({ _id: new ObjectId(id) });
         res.send(result);
       } catch (error) {
-        res.send({ error: true, message: error?.message });
+        res.status(500).json({ error: true, message: error?.message });
       }
     });
 
+    // get all the task from the database.
     app.get("/tasks", verifyJWT, checkEmail, async (req, res) => {
       const email = req.query.email;
       try {
@@ -88,25 +97,32 @@ async function run() {
           .toArray();
         res.send(result);
       } catch (error) {
-        res.send({ error: true, message: error?.message });
-      }
-    });
-    app.post("/task", async (req, res) => {
-      try {
-        const { title, user_email, description, status } = req.body;
-        const result = await taskCollection.insertOne({
-          title,
-          description,
-          status,
-          user_email,
-        });
-        res.send(result);
-      } catch (error) {
-        res.send({ error: true, message: error?.message });
+        res.status(500).json({ error: true, message: error?.message });
       }
     });
 
-    app.delete("/tasks/:id", async (req, res) => {
+    // add a task to the database.
+    app.post("/add-task", async (req, res) => {
+      try {
+        const { title, description, priority, deadline, category, email } =
+          req.body;
+        const taskDetails = {
+          title,
+          description,
+          priority,
+          deadline,
+          category,
+          user_email: email,
+        };
+        const result = await taskCollection.insertOne(taskDetails);
+        res.send(result);
+      } catch (error) {
+        res.status(500).json({ error: true, message: error?.message });
+      }
+    });
+
+    // delete specific task from the database.
+    app.delete("/tasks/:id", verifyJWT, checkEmail, async (req, res) => {
       const id = req.params.id;
       try {
         const result = await taskCollection.deleteOne({
@@ -114,22 +130,23 @@ async function run() {
         });
         res.send(result);
       } catch (error) {
-        res.send({ error: true, message: error?.message });
+        res.status(500).json({ error: true, message: error?.message });
       }
     });
 
-    app.put("/tasks/:id", async (req, res) => {
+    // update a specific task from the database.
+    app.put("/tasks/:id", verifyJWT, checkEmail, async (req, res) => {
       const id = req.params.id;
-      const { title, description, status } = req.body;
+      const { title, description, priority, deadline, category } = req.body;
       try {
         const result = await taskCollection.updateOne(
           { _id: new ObjectId(id) },
-          { $set: { title, description, status } },
+          { $set: { title, description, priority, deadline, category } },
           { upsert: true }
         );
         res.send(result);
       } catch (error) {
-        res.send({ error: true, message: error?.message });
+        res.status(500).json({ error: true, message: error?.message });
       }
     });
   } finally {
